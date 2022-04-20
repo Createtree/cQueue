@@ -86,17 +86,17 @@ void cQueue_Delete(cQueue_t* pcQ)
 
 Example:
 ```C
-	cQueue_t* Uart1Queue = cQueue_Create(10); //申请一个最大缓存10帧数据的队列对象
-    char* RData;
-    int len;
-	char *testData = "AddFormatData";//需要发送的数据
-    cQueue_AddFrame(Uart1Queue,&testData,10,0);//发送该数据
-    cQueue_Frame_t* cQF = cQueue_GetFrame(Uart1Queue);//接收该帧
-    
-    if(cQF && cQF->data)//不为空
-    {
-        RData = cQF->data;//得到数据
-        len = cQF->len;//数据的长度        
-    }
+cQueue_t* Uart1Queue = cQueue_Create(10); //申请一个最大缓存10帧数据的队列对象
+char* RData;
+int len;
+char *testData = "AddFormatData";//需要发送的数据
+cQueue_AddFrame(Uart1Queue,&testData,10,0);//发送该数据(该数据内存不需要回收)
+cQueue_Frame_t* cQF = cQueue_GetFrame(Uart1Queue);//接收该帧
+if(cQF && cQF->data)//不为空
+{
+    RData = cQF->data;//得到数据
+    len = cQF->len;//数据的长度        
+}
+cQueue_Delete(Uart1Queue);//删除该队列
 
 ```

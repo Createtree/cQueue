@@ -37,13 +37,17 @@ cQueue_t* cQueue_Create(uint8_t FrameBuf_size)
   */
 uint8_t cQueue_AddFrame(cQueue_t* pcQ, uint8_t** data, uint8_t len, uint8_t CanFree)
 {
-	int pos = pcQ->pWrite%pcQ->size;
+	cQueue_Frame_t* frame = &pcQ->FrameBuf[(pcQ->pWrite)%pcQ->size];
 	if(!_cQueue_IS_FULL(pcQ))
 	{
-		pcQ->FrameBuf[pos].size = len;
-		pcQ->FrameBuf[pos].data = *data;
-		pcQ->FrameBuf[pos].is_read = 0;
-		pcQ->FrameBuf[pos].canFree = CanFree; 
+		if (frame->canFree == 1)
+		{
+			cQueue_Free(frame->data);
+		}
+		frame->size = len;
+		frame->data = *data;
+		frame->is_read = 0;
+		frame->canFree = CanFree; 
 		pcQ->pWrite++;
 		if(pcQ->pWrite > pcQ->size && pcQ->pRead > pcQ->size)//¿ÕÏÐÊ±¼õÉÙÈßÓàÊý
 		{
@@ -79,17 +83,21 @@ unsigned char* cQueueBuf[128];
 uint8_t cQueue_AddFormatData(cQueue_t* pcQ, const char* fmt,...)
 {
 	uint8_t len = 0;
-	int pos = (pcQ->pWrite)%pcQ->size;
-	if(pcQ->FrameBuf[pos].data != NULL && !_cQueue_IS_FULL(pcQ))
+	cQueue_Frame_t* frame = &pcQ->FrameBuf[(pcQ->pWrite)%pcQ->size];
+	if(!_cQueue_IS_FULL(pcQ))
 	{
+		if (frame->canFree == 1)
+		{
+			cQueue_Free(frame->data);
+		}
 		va_list ap;
 		va_start(ap,fmt);
 		len = vsprintf((char*)cQueueBuf,fmt,ap);
 		va_end(ap);
-		pcQ->FrameBuf[pos].is_read = 0;
-		pcQ->FrameBuf[pos].size = len;
-		pcQ->FrameBuf[pos].data = (uint8_t*)memcpy(cQueue_Malloc(len),cQueueBuf,len);
-		pcQ->FrameBuf[pos].canFree = 1;
+		frame->is_read = 0;
+		frame->size = len;
+		frame->data = (uint8_t*)memcpy(cQueue_Malloc(len),cQueueBuf,len);
+		frame->canFree = 1;
 		pcQ->pWrite++;
 		return len;
 	}
@@ -116,8 +124,9 @@ void cQueue_Free_FrameData(cQueue_t* pcQ)
 			cQueue_Free(cQF->data);
 			cQF->size = 0;
 			cQF->canFree = 0;
-			if(--pcQ->clear == 0)break;
+			
 		}
+		if(--pcQ->clear == 0)break;
 	}
 }
 
@@ -130,7 +139,7 @@ void cQueue_Free_FrameData(cQueue_t* pcQ)
   */
 cQueue_Frame_t* cQueue_GetFrame(cQueue_t* pcQ)
 {
-	if(pcQ->clear > 0)cQueue_Free_FrameData(pcQ);
+	//if(pcQ->clear > 0)cQueue_Free_FrameData(pcQ);
 	if(_cQueue_IS_NULL(pcQ))
 	{
 		return NULL;
@@ -154,6 +163,7 @@ void cQueue_Delete(cQueue_t* pcQ)
 	{
 		cQueue_GetFrame(pcQ);
 	}
+	cQueue_Free_FrameData(pcQ);
 	cQueue_Free(pcQ->FrameBuf);
 	cQueue_Free(pcQ);
 }
