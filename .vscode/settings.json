@@ -1,6 +1,14 @@
 {
     "files.associations": {
         "stdio.h": "c",
-        "stdarg.h": "c"
-    }
+        "stdarg.h": "c",
+        "cqueue.h": "c"
+    },
+    "makefile.launchConfigurations": [
+        {
+            "cwd": "d:\\A\\C\\!Project\\cqueue\\output",
+            "binaryPath": "d:\\A\\C\\!Project\\cqueue\\output\\main.exe",
+            "binaryArgs": []
+        }
+    ]
 }

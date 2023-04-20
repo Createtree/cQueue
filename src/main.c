@@ -17,89 +17,260 @@ int test_pass = 0;
         }\
     } while(0)
 
-#define EXPECT_EQ_cQueueAddFrame(expect, actual) EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%d")
+#define EXPECT_EQ_INT(expect, actual) EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%d")
+#define EXPECT_EQ_TESTTYPE(testData_, actData_, len)                         \
+	do                                                                       \
+	{                                                                        \
+		test_count++;                                                        \
+		if (compareTestDatas(testData_, actData_, len) == -1)                \
+			test_pass++;                                                     \
+		else                                                                 \
+		{                                                                    \
+			fprintf(stderr, "[%d]%s:%d:\n", test_count, __FILE__, __LINE__); \
+			printTestDatas(testData_, len);                                  \
+			printTestDatas(actData_, len);                                   \
+			main_ret = 1;                                                    \
+		}                                                                    \
+	} while (0)
 
-
-
-void Test_cQueue_AddFormatData(void)
+typedef short testType;
+#define TESTSIZE 10
+#define TESTUNIT sizeof(testType)
+testType DataBuf[TESTSIZE] = {0};
+cQueue_t cQStatic;
+cQueue_t* pcQ;
+testType TestData[TESTSIZE] = {0,1,2,3,4,5,6,7,8,9};
+testType TestData2[TESTSIZE+2] = {0,1,2,3,4,5,6,7,8,9,10,11};
+int compareTestDatas(const testType *td1, const testType *td2, int size)
 {
-	cQueue_t* Uart1Queue;
-	Uart1Queue = cQueue_Create(10);
-	char *testData = "AddFormatData";
-	cQueue_Frame_t* cQF = NULL;
-	for (size_t i = 0; i < 30; i++)
+	int i;
+	for (i = 0; i < size; i++)
 	{
-		cQueue_AddFormatData(Uart1Queue,testData+i%14);
-		cQF = cQueue_GetFrame(Uart1Queue);
-		int c = 1;
-		if(cQF && cQF->data)
-		{
-			c = memcmp(cQF->data,testData+i%14,cQF->size);
-			// printf("%d:%s:%d\n",i,cQF->data,c);
-		}
-		EXPECT_EQ_cQueueAddFrame(0,c);
+		if(td1[i] != td2[i])
+			return i;
 	}
-	cQueue_Delete(Uart1Queue);
+	return -1;
 }
 
-void Test_cQueue_AddFrame()
-{
-	cQueue_t* Uart1Queue;
-	Uart1Queue = cQueue_Create(10);
-	uint8_t *testData = "AddFrame ";
+#define printTestDatas(td, size)               \
+	do                                         \
+	{                                          \
+		int ii = size;                         \
+		printf(#td ":\n    ");                 \
+		while (ii--)                           \
+			printf("%3d ", td[size - 1 - ii]); \
+		printf("\n");                          \
+	} while (0)
 
-	for (size_t i = 31; i < 100; i++)
-	{
-		int c = 1;
-		testData = (char*)malloc(10);
-		memset(testData,i,9);testData[9]='\0';
-		cQueue_AddFrame(Uart1Queue,&testData,10,1);
-		cQueue_Frame_t* cQF = cQueue_GetFrame(Uart1Queue);
-		if(cQF && cQF->data)
-		{
-			c = memcmp(cQF->data,testData,cQF->size);
-			//printf("%d:%s:%d\n",i,cQF->data,c);	
-		}
-		EXPECT_EQ_cQueueAddFrame(0,c);	
-	}
-	cQueue_Delete(Uart1Queue);
+void Test_cQueue_Create(void)
+{
+	cQueue_Create_Static(&cQStatic, &DataBuf, TESTUNIT, TESTSIZE);
+	pcQ = cQueue_Create(TESTUNIT, TESTSIZE);
+	if(!pcQ) return;
+	EXPECT_EQ_INT(TESTSIZE, cQueue_Spare(pcQ));
+	EXPECT_EQ_INT(TESTSIZE, cQueue_Spare(&cQStatic));
 }
 
-void Test_cQueue_AddFrameCopy()
+void Test_cQueue_WRData(cQueue_t *p, testType *testData, int len)
 {
-	cQueue_t* Uart1Queue;
-	Uart1Queue = cQueue_Create(10);
-	char *Text = "AddFrameCopy";
-	char *testData = Text;
-	for (size_t i = 0; i < 30; i++)
+    int i;
+    testType actData[TESTSIZE] = {0};
+    for (i = 0; i < len; i++)
+    {
+        cQueue_Push(p, &testData[i]);
+    }
+    while (i--)
 	{
-		int c = 1;
-		testData = Text + i%12;
-		cQueue_AddFrameCopy(Uart1Queue,&(testData),12-i%12);
-		cQueue_Frame_t* cQF = cQueue_GetFrame(Uart1Queue);
-		if(cQF && cQF->data)
-		{
-			c = memcmp(cQF->data,testData,cQF->size);
-			// printf("%d:%s:%d\n",i,cQF->data,c);
-		}
-		EXPECT_EQ_cQueueAddFrame(0,c);
+		cQueue_Pop(p, &actData[len - 1 - i]);
 	}
-	cQueue_Delete(Uart1Queue);
- 
+
+	EXPECT_EQ_TESTTYPE(testData, actData, len);
 }
+
+void Test_cQueue_WRDatas(cQueue_t *p, testType *testData, int len)
+{
+	int i;
+	testType actData[TESTSIZE] = {0};
+	cQueue_Pushs(p, testData, len);
+	cQueue_Pops(p, actData, len);
+	EXPECT_EQ_TESTTYPE(testData, actData, len);
+	memset(actData, 0, len);
+	for (i = 0; i < len; i++)
+    {
+        cQueue_Pushs(p, &testData[i], 1);
+    }
+    while (i--)
+	{
+		cQueue_Pops(p, &actData[len - 1 - i], 1);
+	}
+	EXPECT_EQ_TESTTYPE(testData, actData, len);
+}
+
+void Test_cQueue_OverWrite(cQueue_t *p, testType *testData, int len)
+{
+	int i = 0;
+	testType actData[TESTSIZE] = {0};
+	testType test[TESTSIZE] = {0};
+	// memset(actData, 11, len);
+	cQueue_OverWrite(p, testData, len);
+	cQueue_Peeks(p, actData, len);
+	EXPECT_EQ_TESTTYPE(testData, actData, len);
+
+	cQueue_OverWrite(p, test, TESTSIZE); //Ð´Âú0
+	cQueue_Peeks(p, actData, TESTSIZE);
+	EXPECT_EQ_TESTTYPE(test, actData, TESTSIZE);
+	
+	for (i = 0; i < len; i++)
+	{
+		cQueue_OverWrite(p, &testData[i], 1);
+		test[TESTSIZE - len + i] = testData[i];
+	}
+	cQueue_Pops(p, actData, TESTSIZE);
+	EXPECT_EQ_TESTTYPE(test, actData, len);
+
+}
+
+void Test_cQueue_FULL_NULL(cQueue_t *p, testType *testData, int testlen, int actlen)
+{
+	testType *actData = MALLOC(TESTUNIT * testlen);
+	int i;
+	int full = testlen - actlen;
+	if(actData == NULL || full <= 0)
+	{
+		assert(0);
+		return;
+	}
+	for (i = 0; i < testlen; i++)
+	{
+		if (cQueue_Push(p, &testData[i]) == CQUEUE_FULL)
+			full--;
+	}
+	EXPECT_EQ_INT(0, full);
+	while (i--)
+	{
+		if (cQueue_Pop(p, &actData[testlen - 1 - i]) == CQUEUE_NULL)
+			full++;
+	}
+	EXPECT_EQ_INT(testlen - actlen, full);
+
+	full = 0;
+	if (cQueue_Peek(p, &actData[0]) == CQUEUE_NULL)
+		full++;
+	EXPECT_EQ_INT(1, full);
+
+	full = testlen - actlen;
+	for (i = 0; i < testlen; i++)
+	{
+		if (cQueue_Pushs(p, &testData[i], 1) == CQUEUE_FULL)
+			full--;
+	}
+	EXPECT_EQ_INT(0, full);
+	while (i--)
+	{
+		if (cQueue_Pops(p, &actData[testlen - 1 - i], 1) == CQUEUE_NULL)
+			full++;
+	}
+	EXPECT_EQ_INT(testlen - actlen, full);
+
+	full = 0;
+	cQueue_Push(p, &testData[0]);
+	if (cQueue_Peeks(p, &actData[testlen - 1 - i], 2) == CQUEUE_NULL)
+			full++;
+	EXPECT_EQ_INT(1, full);
+
+	FREE(actData);
+}
+
+void Test_cQueue_Peek(cQueue_t *p , testType *testData, int len)
+{
+	testType actData[TESTSIZE] = {0};
+	int i = len;
+	cQueue_Pushs(p, testData, len);
+	while(i--)
+	{
+		cQueue_Peek(p, &actData[len - 1 - i]);
+		cQueue_Skip(p, 1);
+	}
+	EXPECT_EQ_TESTTYPE(testData, actData, len);
+}
+
+void Test_cQueue_Peeks(cQueue_t *p, testType *testData, int len)
+{
+	testType actData[TESTSIZE] = {0};
+	cQueue_Pushs(p, testData, len);
+	cQueue_Peeks(p, actData, len);
+	EXPECT_EQ_TESTTYPE(testData, actData, len);
+	cQueue_Clear(p);
+}
+
+void Test_cQueue_Clear(cQueue_t *p)
+{
+	testType t;
+	cQueue_Push(p, &t);
+	cQueue_Clear(p);
+	EXPECT_EQ_INT(p->len, cQueue_Spare(p));
+}
+
+void Test_cQueue_Destroy()
+{
+	cQueue_Destroy(pcQ);
+	pcQ = NULL;
+}
+
 void cQueue_Test(void)
 {
-	Test_cQueue_AddFormatData();
-	Test_cQueue_AddFrame();
-	Test_cQueue_AddFrameCopy();
+
+	Test_cQueue_Create();
+
+	Test_cQueue_WRData(pcQ, TestData, TESTSIZE/2);
+	Test_cQueue_WRData(&cQStatic, TestData, TESTSIZE/2);
+	Test_cQueue_WRData(pcQ, TestData, TESTSIZE);
+	Test_cQueue_WRData(&cQStatic, TestData, TESTSIZE);
+
+	Test_cQueue_WRDatas(pcQ, TestData, TESTSIZE/2-1);
+	Test_cQueue_WRDatas(&cQStatic, TestData, TESTSIZE/2-1);
+	Test_cQueue_WRDatas(pcQ, TestData, TESTSIZE/2+1);
+	Test_cQueue_WRDatas(&cQStatic, TestData, TESTSIZE/2+1);
+	Test_cQueue_WRDatas(pcQ, TestData, TESTSIZE/2);
+	Test_cQueue_WRDatas(&cQStatic, TestData, TESTSIZE/2);
+	Test_cQueue_WRDatas(pcQ, TestData, TESTSIZE);
+	Test_cQueue_WRDatas(&cQStatic, TestData, TESTSIZE);
+
+	Test_cQueue_OverWrite(pcQ, TestData, TESTSIZE/2-1);
+	Test_cQueue_OverWrite(&cQStatic, TestData, TESTSIZE/2-1);
+	Test_cQueue_OverWrite(pcQ, TestData, TESTSIZE/2+1);
+	Test_cQueue_OverWrite(&cQStatic, TestData, TESTSIZE/2+1);
+	Test_cQueue_OverWrite(pcQ, TestData, TESTSIZE/2);
+	Test_cQueue_OverWrite(&cQStatic, TestData, TESTSIZE/2);
+	Test_cQueue_OverWrite(pcQ, TestData, TESTSIZE);
+	Test_cQueue_OverWrite(&cQStatic, TestData, TESTSIZE);
+
+	Test_cQueue_Clear(pcQ);
+	Test_cQueue_Clear(&cQStatic);
+
+	Test_cQueue_Peek(pcQ, TestData, TESTSIZE);
+	Test_cQueue_Peek(&cQStatic, TestData, TESTSIZE);
+	Test_cQueue_Peeks(pcQ, TestData, TESTSIZE/2);
+	Test_cQueue_Peeks(&cQStatic, TestData, TESTSIZE/2);
+	Test_cQueue_Peeks(pcQ, TestData, TESTSIZE);
+	Test_cQueue_Peeks(&cQStatic, TestData, TESTSIZE);
+
+
+	//Exception Testing
+	Test_cQueue_FULL_NULL(pcQ, TestData2, TESTSIZE + 2, TESTSIZE);
+	Test_cQueue_FULL_NULL(&cQStatic, TestData2, TESTSIZE + 2, TESTSIZE);
+
+
+	Test_cQueue_Destroy();
 	
 }
+
 int main()
 {
 	
 	cQueue_Test();//µ¥Ôª²âÊÔ
 	printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
-	MALLOC(4);
+	//MALLOC(4);
 	PRINT_LEAK_INFO();//ÄÚ´æÐ¹Â©²âÊÔ
 	return (0);
 }

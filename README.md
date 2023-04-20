@@ -1,102 +1,120 @@
 # cQueue
->基于C语言的循环队列，采用引用或拷贝方式来传递帧格式数据，并实现了自动管理内存
+
+> 基于C语言的泛型队列
+
+[项目地址 Createtree/cQueue: Generic Queue Based on C (github.com)](https://github.com/Createtree/cQueue)
+
 ## API
+
 ```C
-cQueue_t* cQueue_Create(uint8_t FrameBuf_size);
-uint8_t cQueue_AddFrame(cQueue_t* pcQ, uint8_t** data, uint8_t len, uint8_t CanFree);
-uint8_t cQueue_AddFrameCopy(cQueue_t* pcQ, uint8_t** data, uint8_t len);
-uint8_t cQueue_AddFormatData(cQueue_t* pcQ, const char* fmt,...);
-void cQueue_Free_FrameData(cQueue_t* pcQ);
-cQueue_Frame_t* cQueue_GetFrame(cQueue_t* pcQ);
-void cQueue_Delete(cQueue_t* pcQ);
+cQueue_t* cQueue_Create(uint8_t UnitSize, uint16_t Length);
+void cQueue_Create_Static(cQueue_t* pcQueue, void* pdata, uint8_t UnitSize, uint16_t Length);
+cQueueStatus cQueue_Push(cQueue_t* pcQ, void* pdata);
+cQueueStatus cQueue_Pushs(cQueue_t* pcQ, void* pdata, uint16_t size);
+cQueueStatus cQueue_OverWrite(cQueue_t* pcQ, void* pdata, uint16_t size);
+cQueueStatus cQueue_Pop(cQueue_t *pcQ, void* pReceive);
+cQueueStatus cQueue_Pops(cQueue_t *pcQ, void* pReceive, uint16_t size);
+cQueueStatus cQueue_Peek(cQueue_t *pcQ, void* pReceive);
+cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void* pReceive, uint16_t size);
+uint16_t cQueue_Spare(cQueue_t *pcQ);
+void cQueue_Clear(cQueue_t *pcQ);
+int cQueue_Skip(cQueue_t *pcQ, uint16_t len);
+cQueueStatus cQueue_Destroy(cQueue_t* pcQ);
 ```
+
 ## 使用方法
+
+### 创建队列
+
+动态创建
+
 ```C
-/**
-  * @brief  创建队列 
-  * @param  队列的最大帧容纳量 
-  * @notes  不使用记得回收 
-  * @retval 队列句柄 
-  */
-cQueue_t* cQueue_Create(uint8_t FrameBuf_size)
-
-
-
-/**
-  * @brief  添加队列帧
-  * @param  队列句柄
-  * @param  帧数据的首地址
-  * @param	帧数据的长度
-  * @param	可以释放 
-  * @notes  帧的传递为引用的传递
-  * @retval 成功:1,失败:0 
-  */
-uint8_t cQueue_AddFrame(cQueue_t* pcQ, uint8_t** data, uint8_t len, uint8_t CanFree)
-
-
-/**
-  * @brief  添加队列帧的拷贝
-  * @param  队列句柄
-  * @param  帧数据的首地址
-  * @param	帧数据的长度
-  * @notes  帧的传递为拷贝的传递
-  * @retval 成功:1,失败:0 
-  */
-uint8_t cQueue_AddFrameCopy(cQueue_t* pcQ, uint8_t** data, uint8_t len)
-
-
-/**
-  * @brief  添加格式化帧类型数据 
-  * @param  队列句柄 
-  * @notes  拷贝的方式，注意格式化缓存大小 
-  * @retval 格式化后数据的长度 
-  */
-unsigned char* cQueueBuf[128];
-uint8_t cQueue_AddFormatData(cQueue_t* pcQ, const char* fmt,...)
-
-
-
-/**
-  * @brief  释放帧数据的内存
-  * @param  队列句柄 
-  * @notes  回收帧数据的内存 
-  * @retval None
-  */
-void cQueue_Free_FrameData(cQueue_t* pcQ)
-
-
-
-/**
-  * @brief  从队列得到消息 
-  * @param  队列句柄 
-  * @notes  获取发送数据的引用 
-  * @retval 数据帧格式 
-  */
-cQueue_Frame_t* cQueue_GetFrame(cQueue_t* pcQ)
-
-
-/**
-  * @brief  删除队列
-  * @param  队列句柄 
-  * @notes  请勿在使用时删除 
-  * @retval None 
-  */
-void cQueue_Delete(cQueue_t* pcQ)
-```
-
-Example:
-```C
-cQueue_t* Uart1Queue = cQueue_Create(10); //申请一个最大缓存10帧数据的队列对象
-char* RData;
-int len;
-char *testData = "AddFormatData";//需要发送的数据
-cQueue_AddFrame(Uart1Queue,&testData,10,0);//发送该数据(该数据内存不需要回收)
-cQueue_Frame_t* cQF = cQueue_GetFrame(Uart1Queue);//接收该帧
-if(cQF && cQF->data)//不为空
+// Global variable
+cQueue_t *pcQ;
+// Dynamic create (need malloc)
+pcQ = cQueue_Create(sizeof(int), 10);
+if(pcQ == NULL)
 {
-    RData = cQF->data;//得到数据
-    len = cQF->len;//数据的长度        
+  // do something that...
 }
-cQueue_Delete(Uart1Queue);//删除该队列
-
 ```
+
+静态创建
+
+```C
+// Global variable
+cQueue_t cQStaticHandle;
+int dataBuf[10];
+// cQueue create static
+cQueue_Create_Static(&cQStaticHandle, &dataBuf, sizeof(int), 10)
+```
+
+### 写入元素
+
+写入一个
+
+```C
+int a = 10;
+if (cQueue_Push(pcQ, &a) == CQUEUE_OK)
+{
+  // Successfully added a data
+}
+```
+
+写入指定长度
+
+```C
+int arr[5] = {1,2,3,4,5};
+if (cQueue_Pushs(pcQ, &arr, 5) == CQUEUE_OK)
+{
+  // Successfully added the array
+}
+```
+
+### 读出元素
+
+弹出一个
+
+```C
+int a;
+if (cQueue_Pop(pcQ, &a) == CQUEUE_OK)
+{
+  // Successfully pop a data 
+}
+```
+
+弹出指定长度
+
+```C
+int arr[5];
+if (cQueue_Pops(pcQ, &arr, 5) == CQUEUE_OK)
+{
+  // Successfully popped 5 data to arr
+}
+```
+
+偷看 (读出之后任然保留在缓存中)
+
+```C
+int a;
+if (cQueue_Peek(pcQ, &a) == CQUEUE_OK)
+{
+  // Successfully peek a data 
+}
+```
+
+### 销毁
+
+```C
+if (cQueue_Destroy(pcQ) != CQUEUE_OK)
+{
+  // May be in use during interrupts or other threads
+}
+```
+
+## Update Log
+
+### v1.0-2023.4.17
+
+> - Rewritten cQueue that supports generics
+> - Unit testing completed
