@@ -4,9 +4,9 @@
 /*----------------------------------------------------------------------
   - File name     : cQueue.h
   - Author        : liuzhihua
-  - Update date   : 2023.4.17
+  - Update date   : 2024.03.09
   -	File Function : Circular Queue
-  - Version       : v1.0
+  - Version       : v1.1
   - Origin        ：https://github.com/Createtree/cQueue
 -----------------------------------------------------------------------*/
 /*-----------------------------------------------------------------------
@@ -19,6 +19,7 @@
   * ------------   ---------------   ----------------------------------
   *  2022.04.02       liuzhihua                  Create file
   *  2023.04.17       liuzhihua                   Rewrite
+  *  2024.03.09       liuzhihua                Add and modify
 ***/
 
 #ifndef __CQUEUE_H_
@@ -72,7 +73,7 @@
 
 typedef struct cQueue_TypeDef
 {
-	void* data;
+	void *data;
   uint8_t unitSize;
 	uint16_t len;
 	uint16_t pWrite;
@@ -99,19 +100,31 @@ enum{
 /*-----------------------------------------------------------------------
 |                             API FUNCTION                              |
 -----------------------------------------------------------------------*/
-cQueue_t* cQueue_Create(uint8_t UnitSize, uint16_t Length);
-void cQueue_Create_Static(cQueue_t* pcQueue, void* pdata, uint8_t UnitSize, uint16_t Length);
-cQueueStatus cQueue_Push(cQueue_t* pcQ, void* pdata);
-cQueueStatus cQueue_Pushs(cQueue_t* pcQ, void* pdata, uint16_t size);
-cQueueStatus cQueue_OverWrite(cQueue_t* pcQ, void* pdata, uint16_t size);
-cQueueStatus cQueue_Pop(cQueue_t *pcQ, void* pReceive);
-cQueueStatus cQueue_Pops(cQueue_t *pcQ, void* pReceive, uint16_t size);
-cQueueStatus cQueue_Peek(cQueue_t *pcQ, void* pReceive);
-cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void* pReceive, uint16_t size);
+cQueue_t *cQueue_Create(uint8_t UnitSize, uint16_t Length);
+void cQueue_Create_Static(cQueue_t *pcQueue, void *pdata, uint8_t UnitSize, uint16_t Length);
+cQueueStatus cQueue_Push(cQueue_t *pcQ, void *pdata);
+cQueueStatus cQueue_Pushs(cQueue_t *pcQ, void *pdata, uint16_t size);
+cQueueStatus cQueue_OverWrite(cQueue_t *pcQ, void *pdata, uint16_t size);
+cQueueStatus cQueue_Pop(cQueue_t *pcQ, void *pReceive);
+cQueueStatus cQueue_Pops(cQueue_t *pcQ, void *pReceive, uint16_t size);
+cQueueStatus cQueue_Peek(cQueue_t *pcQ, void *pReceive);
+cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void *pReceive, uint16_t size);
+cQueueStatus cQueue_Pushv(cQueue_t *pcQ, void *pdata, uint16_t size);
+uint16_t cQueue_Popv(cQueue_t *pcQ, void *pdata, uint16_t size);
+uint16_t cQueue_Empty(cQueue_t *pcQ);
+uint16_t cQueue_Full(cQueue_t *pcQ);
+uint16_t cQueue_Usage(cQueue_t *pcQ);
 uint16_t cQueue_Spare(cQueue_t *pcQ);
-void cQueue_Clear(cQueue_t *pcQ);
+uint16_t cQueue_GetReadPtrMargin(cQueue_t *pcQ);
+uint16_t cQueue_GetWritePtrMargin(cQueue_t *pcQ);
+uint16_t cQueue_GetLength(cQueue_t *pcQ);
 int cQueue_Skip(cQueue_t *pcQ, uint16_t len);
-cQueueStatus cQueue_Destroy(cQueue_t* pcQ);
+void cQueue_Clear(cQueue_t *pcQ);
+void *cQueue_GetReadAdr(cQueue_t *pcQ);
+void *cQueue_GetWriteAdr(cQueue_t *pcQ);
+void cQueue_MoveWrite(cQueue_t *pcQ, uint16_t len);
+void cQueue_MoveRead(cQueue_t *pcQ, uint16_t len);
+cQueueStatus cQueue_Destroy(cQueue_t *pcQ);
 #ifdef __cplusplus
 }
 #endif

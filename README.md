@@ -7,19 +7,31 @@
 ## API
 
 ```C
-cQueue_t* cQueue_Create(uint8_t UnitSize, uint16_t Length);
-void cQueue_Create_Static(cQueue_t* pcQueue, void* pdata, uint8_t UnitSize, uint16_t Length);
-cQueueStatus cQueue_Push(cQueue_t* pcQ, void* pdata);
-cQueueStatus cQueue_Pushs(cQueue_t* pcQ, void* pdata, uint16_t size);
-cQueueStatus cQueue_OverWrite(cQueue_t* pcQ, void* pdata, uint16_t size);
-cQueueStatus cQueue_Pop(cQueue_t *pcQ, void* pReceive);
-cQueueStatus cQueue_Pops(cQueue_t *pcQ, void* pReceive, uint16_t size);
-cQueueStatus cQueue_Peek(cQueue_t *pcQ, void* pReceive);
-cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void* pReceive, uint16_t size);
+cQueue_t *cQueue_Create(uint8_t UnitSize, uint16_t Length);
+void cQueue_Create_Static(cQueue_t *pcQueue, void *pdata, uint8_t UnitSize, uint16_t Length);
+cQueueStatus cQueue_Push(cQueue_t *pcQ, void *pdata);
+cQueueStatus cQueue_Pushs(cQueue_t *pcQ, void *pdata, uint16_t size);
+cQueueStatus cQueue_OverWrite(cQueue_t *pcQ, void *pdata, uint16_t size);
+cQueueStatus cQueue_Pop(cQueue_t *pcQ, void *pReceive);
+cQueueStatus cQueue_Pops(cQueue_t *pcQ, void *pReceive, uint16_t size);
+cQueueStatus cQueue_Peek(cQueue_t *pcQ, void *pReceive);
+cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void *pReceive, uint16_t size);
+cQueueStatus cQueue_Pushv(cQueue_t *pcQ, void *pdata, uint16_t size);
+uint16_t cQueue_Popv(cQueue_t *pcQ, void *pdata, uint16_t size);
+uint16_t cQueue_Empty(cQueue_t *pcQ);
+uint16_t cQueue_Full(cQueue_t *pcQ);
+uint16_t cQueue_Usage(cQueue_t *pcQ);
 uint16_t cQueue_Spare(cQueue_t *pcQ);
-void cQueue_Clear(cQueue_t *pcQ);
+uint16_t cQueue_GetReadPtrMargin(cQueue_t *pcQ);
+uint16_t cQueue_GetWritePtrMargin(cQueue_t *pcQ);
+uint16_t cQueue_GetLength(cQueue_t *pcQ);
 int cQueue_Skip(cQueue_t *pcQ, uint16_t len);
-cQueueStatus cQueue_Destroy(cQueue_t* pcQ);
+void cQueue_Clear(cQueue_t *pcQ);
+void *cQueue_GetReadAdr(cQueue_t *pcQ);
+void *cQueue_GetWriteAdr(cQueue_t *pcQ);
+void cQueue_MoveWrite(cQueue_t *pcQ, uint16_t len);
+void cQueue_MoveRead(cQueue_t *pcQ, uint16_t len);
+cQueueStatus cQueue_Destroy(cQueue_t *pcQ);
 ```
 
 ## 使用方法
@@ -113,6 +125,13 @@ if (cQueue_Destroy(pcQ) != CQUEUE_OK)
 ```
 
 ## Update Log
+
+### v1.1-2024.3.9
+
+> - 新增可变长度数据的操作 `pushv/popv`
+> - 新增队列使用量(Usage)、满状态(Full)、空状态(Empty)的获取
+> - 新增获取队列读写指针到末端的空余量的获取功能
+> - 开放了读指针写指针内存地址的获取接口，通过该接口可用方便DMA搬运数据或者外部操作数据
 
 ### v1.0-2023.4.17
 

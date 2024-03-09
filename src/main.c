@@ -18,7 +18,7 @@ int test_pass = 0;
     } while(0)
 
 #define EXPECT_EQ_INT(expect, actual) EXPECT_EQ_BASE((expect) == (actual), expect, actual, "%d")
-#define EXPECT_EQ_TESTTYPE(testData_, actData_, len)                         \
+#define EXPECT_EQ_TESTARRAY(testData_, actData_, len)                         \
 	do                                                                       \
 	{                                                                        \
 		test_count++;                                                        \
@@ -32,6 +32,7 @@ int test_pass = 0;
 			main_ret = 1;                                                    \
 		}                                                                    \
 	} while (0)
+#define EXPECT_EQ_TESTTYPE(testData_, actData_, len) EXPECT_EQ_TESTARRAY(testData_, actData_, len*sizeof(testType))
 
 typedef short testType;
 #define TESTSIZE 10
@@ -41,12 +42,13 @@ cQueue_t cQStatic;
 cQueue_t* pcQ;
 testType TestData[TESTSIZE] = {0,1,2,3,4,5,6,7,8,9};
 testType TestData2[TESTSIZE+2] = {0,1,2,3,4,5,6,7,8,9,10,11};
-int compareTestDatas(const testType *td1, const testType *td2, int size)
+int compareTestDatas(const void *td1, const void *td2, int size)
 {
 	int i;
+
 	for (i = 0; i < size; i++)
 	{
-		if(td1[i] != td2[i])
+		if(((uint8_t*)td1)[i] != ((uint8_t*)td2)[i])
 			return i;
 	}
 	return -1;
@@ -135,6 +137,7 @@ void Test_cQueue_FULL_NULL(cQueue_t *p, testType *testData, int testlen, int act
 	testType *actData = MALLOC(TESTUNIT * testlen);
 	int i;
 	int full = testlen - actlen;
+	cQueue_Clear(p);
 	if(actData == NULL || full <= 0)
 	{
 		assert(0);
@@ -203,12 +206,64 @@ void Test_cQueue_Peeks(cQueue_t *p, testType *testData, int len)
 	cQueue_Clear(p);
 }
 
+void Test_cQueue_WR_VariableLength(uint8_t *testData, int len)
+{
+	int retlen;
+	uint8_t *actData = MALLOC(len * sizeof(uint8_t));
+	cQueue_t *p = cQueue_Create(1, 2*(len+2));
+	cQueue_Pushv(p, testData, len);
+	cQueue_Pushv(p, testData, len>>1);
+	retlen = cQueue_Popv(p, actData, len);
+	EXPECT_EQ_INT(len, retlen);
+	EXPECT_EQ_TESTARRAY(testData, actData, len);
+	retlen = cQueue_Popv(p, actData, len);
+	EXPECT_EQ_INT(len>>1, retlen);
+	EXPECT_EQ_TESTARRAY(testData, actData, (len>>1));
+	cQueue_Destroy(p);
+	FREE(actData);
+}
+
+void Test_cQueue_WR_Margin(cQueue_t *p, testType *testData, int len)
+{
+	uint16_t retlen;
+	cQueue_Clear(p);
+	retlen = cQueue_GetReadPtrMargin(p);
+	EXPECT_EQ_INT(0, retlen);
+	retlen = cQueue_GetWritePtrMargin(p);
+	EXPECT_EQ_INT(p->len, retlen);
+	
+	cQueue_Pushs(p, testData, len>>1);
+	retlen = cQueue_GetWritePtrMargin(p);
+	EXPECT_EQ_INT(p->len - (len>>1), retlen);
+	retlen = cQueue_GetReadPtrMargin(p);
+	EXPECT_EQ_INT(len>>1, retlen);
+}
+
 void Test_cQueue_Clear(cQueue_t *p)
 {
 	testType t;
 	cQueue_Push(p, &t);
 	cQueue_Clear(p);
+	EXPECT_EQ_INT(1, cQueue_Empty(p));
 	EXPECT_EQ_INT(p->len, cQueue_Spare(p));
+}
+
+void Test_cQueue_Full_Usage(cQueue_t *p)
+{
+	testType t;
+	int cnt = 0;
+	cQueue_Clear(p);
+	for (size_t i = 0; i < p->len; i++)
+	{
+		cQueue_Push(p, &t);
+		if (i+1 == cQueue_Usage(p))
+		{
+			cnt++;
+		}
+	}
+	EXPECT_EQ_INT(p->len, cnt);
+	EXPECT_EQ_INT(1, cQueue_Full(p));
+	cQueue_Clear(p);
 }
 
 void Test_cQueue_Destroy()
@@ -247,6 +302,8 @@ void cQueue_Test(void)
 
 	Test_cQueue_Clear(pcQ);
 	Test_cQueue_Clear(&cQStatic);
+	Test_cQueue_Full_Usage(pcQ);
+	Test_cQueue_Full_Usage(&cQStatic);
 
 	Test_cQueue_Peek(pcQ, TestData, TESTSIZE);
 	Test_cQueue_Peek(&cQStatic, TestData, TESTSIZE);
@@ -255,11 +312,13 @@ void cQueue_Test(void)
 	Test_cQueue_Peeks(pcQ, TestData, TESTSIZE);
 	Test_cQueue_Peeks(&cQStatic, TestData, TESTSIZE);
 
-
+	Test_cQueue_WR_VariableLength((uint8_t*)TestData, TESTSIZE*sizeof(testType));
+	Test_cQueue_WR_VariableLength((uint8_t*)TestData, TESTSIZE/2*sizeof(testType));
+	Test_cQueue_WR_Margin(pcQ, TestData, TESTSIZE);
+	Test_cQueue_WR_Margin(&cQStatic, TestData, TESTSIZE/2);
 	//Exception Testing
 	Test_cQueue_FULL_NULL(pcQ, TestData2, TESTSIZE + 2, TESTSIZE);
 	Test_cQueue_FULL_NULL(&cQStatic, TestData2, TESTSIZE + 2, TESTSIZE);
-
 
 	Test_cQueue_Destroy();
 	

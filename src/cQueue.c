@@ -4,12 +4,10 @@
 							(cQueue)->pRead - (cQueue)->pWrite)
 #define cQueue_IS_FULL(cQueue) (((cQueue)->pWrite == (cQueue)->pRead) && (cQueue->full) ? 1 : 0)
 #define cQueue_IS_NULL(cQueue) (((cQueue)->pWrite == (cQueue)->pRead) && (!cQueue->full) ? 1 : 0)
+#define cQueue_WriteAdr(cQueue) ((uint8_t*)(cQueue)->data + (cQueue)->pWrite * (cQueue)->unitSize)
+#define cQueue_ReadAdr(cQueue)  ((uint8_t*)(cQueue)->data + (cQueue)->pRead * (cQueue)->unitSize)
 
-#define _WriteAdr(cQueue) ((uint8_t*)(cQueue)->data + (cQueue)->pWrite * (cQueue)->unitSize)
-#define _ReadAdr(cQueue)  ((uint8_t*)(cQueue)->data + (cQueue)->pRead * (cQueue)->unitSize)
-
-
-static inline void _WriteMove(cQueue_t *pcQ, uint16_t len)
+static inline void cQueue_WriteMove(cQueue_t *pcQ, uint16_t len)
 {
 	pcQ->pWrite += len;
 	if (pcQ->pWrite >= pcQ->len)//代替取余，提高速度
@@ -22,7 +20,7 @@ static inline void _WriteMove(cQueue_t *pcQ, uint16_t len)
 	}
 }
 
-static inline void _ReadMove(cQueue_t *pcQ, uint16_t len)
+static inline void cQueue_ReadMove(cQueue_t *pcQ, uint16_t len)
 {
 	pcQ->pRead += len;
 	pcQ->full = 0;
@@ -36,16 +34,21 @@ static inline void _ReadMove(cQueue_t *pcQ, uint16_t len)
  * @brief 创建队列
  * @param UnitSize 队列单元尺寸(Byte)
  * @param Length 队列单元数量
- * @retval cQueue_t* 队列句柄
+ * @retval cQueue_t *队列句柄
  */
-cQueue_t* cQueue_Create(uint8_t UnitSize, uint16_t Length)
+cQueue_t *cQueue_Create(uint8_t UnitSize, uint16_t Length)
 {
 	cQueueAssert(UnitSize && Length);
 
-	cQueue_t* pcQ = cQueue_Malloc(sizeof(cQueue_t));
+	cQueue_t *pcQ = cQueue_Malloc(sizeof(cQueue_t));
 	if(pcQ != NULL)
 	{
 		pcQ->data = cQueue_Malloc(Length * UnitSize);
+		if (pcQ->data == NULL)
+		{
+			cQueue_Free(pcQ);
+			return NULL;
+		}
 		pcQ->unitSize = UnitSize;
 		pcQ->len = Length;
 		pcQ->pRead = 0;
@@ -64,14 +67,14 @@ cQueue_t* cQueue_Create(uint8_t UnitSize, uint16_t Length)
  * @param pdata 队列数据指针
  * @param UnitSize 队列单元尺寸(byte)
  * @param Length 队列单元数量
- * @retval cQueue_t* 队列句柄
+ * @retval cQueue_t *队列句柄
  */
-void cQueue_Create_Static(cQueue_t* pcQueue, void* pdata, uint8_t UnitSize, uint16_t Length)
+void cQueue_Create_Static(cQueue_t *pcQueue, void *pdata, uint8_t UnitSize, uint16_t Length)
 {
 	cQueueAssert(pcQueue && pdata);
 	cQueueAssert(UnitSize && Length);
 
-	cQueue_t* pcQ = pcQueue;
+	cQueue_t *pcQ = pcQueue;
 	pcQ->unitSize = UnitSize;
 	pcQ->data = pdata;
 	pcQ->len = Length;
@@ -83,13 +86,116 @@ void cQueue_Create_Static(cQueue_t* pcQueue, void* pdata, uint8_t UnitSize, uint
 	pcQ->lock = 0;
 }
 
+/**
+ * @brief 获取队列总单元数
+ * @param pcQ 队列句柄
+ * @retval uint16_t 总元素单元数
+ */
+uint16_t cQueue_GetLength(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	return pcQ->len;
+}
+
+/**
+ * @brief 获取当前队列是否为空
+ * @param pcQ 队列句柄
+ * @retval uint16_t 1:当前队列为空/0:当前队列非空
+ */
+uint16_t cQueue_Empty(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	return !!(cQueue_IS_NULL(pcQ));
+}
+
+/**
+ * @brief 获取当前队列是否已满
+ * @param pcQ 队列句柄
+ * @retval uint16_t 1:当前队列已满/0:当前队列未满
+ */
+uint16_t cQueue_Full(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	return !(cQueue_IS_NULL(pcQ));
+}
+
+/**
+ * @brief 获取读指针地址
+ * @param pcQ 队列句柄
+ * @retval void *
+ */
+void *cQueue_GetReadAdr(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	return cQueue_ReadAdr(pcQ);
+}
+
+/**
+ * @brief 获取写指针地址
+ * @param pcQ 队列句柄
+ * @retval void *
+ */
+void *cQueue_GetWriteAdr(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	return cQueue_WriteAdr(pcQ);
+}
+
+/**
+ * @brief 获取读指针到末端的已用容量
+ * @param pcQ 队列句柄
+ * @retval uint16_t 已用容量[0, len]
+ */
+uint16_t cQueue_GetReadPtrMargin(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	uint16_t size = 0;
+	if (pcQ->pWrite > pcQ->pRead)
+	{
+		size = pcQ->pWrite - pcQ->pRead;
+	}
+	else if (pcQ->pWrite < pcQ->pRead)
+	{
+		size = pcQ->len - pcQ->pRead;
+	}
+	else if (pcQ->full == 1)
+	{
+		size = pcQ->len - pcQ->pRead;
+	}
+	return size;
+}
+
+/**
+ * @brief 获取写指针到末端的可用容量
+ * @param pcQ 队列句柄
+ * @retval uint16_t 可用容量[0, len]
+ */
+uint16_t cQueue_GetWritePtrMargin(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	uint16_t size = 0;
+	if (pcQ->pWrite > pcQ->pRead)
+	{
+		size = pcQ->len - pcQ->pWrite;
+	}
+	else if (pcQ->pWrite < pcQ->pRead)
+	{
+		size = pcQ->pRead - pcQ->pWrite;
+	}
+	else if (pcQ->full != 1)
+	{
+		size = pcQ->len - pcQ->pWrite;
+	}
+	return size;
+}
+
  /**
   * @brief 添加数据单元到队列
   * @param pcQ 队列句柄
   * @param pdata 数据
   * @retval cQueueState OK/FULL/BUSY
   */
-cQueueStatus cQueue_Push(cQueue_t* pcQ, void* pdata)
+cQueueStatus cQueue_Push(cQueue_t *pcQ, void *pdata)
 {
 	cQueueAssert(pcQ);
 	cQueueAssert(pdata);
@@ -103,8 +209,8 @@ cQueueStatus cQueue_Push(cQueue_t* pcQ, void* pdata)
 		status = CQUEUE_FULL;
 		goto exit;
 	}
-	cQueue_Memcpy(_WriteAdr(pcQ), (uint8_t*)pdata, pcQ->unitSize);
-	_WriteMove(pcQ, 1);
+	cQueue_Memcpy(cQueue_WriteAdr(pcQ), (uint8_t*)pdata, pcQ->unitSize);
+	cQueue_WriteMove(pcQ, 1);
 
 	exit:
 	__CQUEUE_UNLOCK(pcQ);
@@ -115,9 +221,10 @@ cQueueStatus cQueue_Push(cQueue_t* pcQ, void* pdata)
   * @brief 添加多个数据单元到队列
   * @param pcQ 队列句柄
   * @param pdata 数据
+  * @param size 数据长度
   * @retval cQueueStatus OK/FULL/BUSY
   */
-cQueueStatus cQueue_Pushs(cQueue_t* pcQ, void* pdata, uint16_t size)
+cQueueStatus cQueue_Pushs(cQueue_t *pcQ, void *pdata, uint16_t size)
 {
 	cQueueAssert(pcQ);
 	cQueueAssert(pcQ->isInit);
@@ -140,11 +247,11 @@ cQueueStatus cQueue_Pushs(cQueue_t* pcQ, void* pdata, uint16_t size)
 		Limit = pcQ->len - pcQ->pWrite;
 		if (Limit >= size)
 		{
-			cQueue_Memcpy(_WriteAdr(pcQ), pdata, pcQ->unitSize * size);
+			cQueue_Memcpy(cQueue_WriteAdr(pcQ), pdata, pcQ->unitSize * size);
 		}
 		else
 		{
-			cQueue_Memcpy(_WriteAdr(pcQ), pdata, pcQ->unitSize * Limit);
+			cQueue_Memcpy(cQueue_WriteAdr(pcQ), pdata, pcQ->unitSize * Limit);
 			pdata = (uint8_t*)pdata + pcQ->unitSize * Limit;
 			cQueue_Memcpy(pcQ->data, pdata, pcQ->unitSize * (size - Limit));
 		}
@@ -157,9 +264,9 @@ cQueueStatus cQueue_Pushs(cQueue_t* pcQ, void* pdata, uint16_t size)
 			status =  CQUEUE_FULL;
 			goto exit;
 		}
-		cQueue_Memcpy(_WriteAdr(pcQ), pdata, pcQ->unitSize * size);
+		cQueue_Memcpy(cQueue_WriteAdr(pcQ), pdata, pcQ->unitSize * size);
 	}
-	_WriteMove(pcQ, size);
+	cQueue_WriteMove(pcQ, size);
 	exit:
 	__CQUEUE_UNLOCK(pcQ);
 	return status;
@@ -169,9 +276,10 @@ cQueueStatus cQueue_Pushs(cQueue_t* pcQ, void* pdata, uint16_t size)
   * @brief 添加多个数据单元到队列(空间不足则覆盖未读数据)
   * @param pcQ 队列句柄
   * @param pdata 数据
+  * @param size 数据长度
   * @retval cQueueStatus OK/BUSY
   */
-cQueueStatus cQueue_OverWrite(cQueue_t* pcQ, void* pdata, uint16_t size)
+cQueueStatus cQueue_OverWrite(cQueue_t *pcQ, void *pdata, uint16_t size)
 {
 	cQueueAssert(pcQ);
 	cQueueAssert(pcQ->isInit);
@@ -186,16 +294,16 @@ cQueueStatus cQueue_OverWrite(cQueue_t* pcQ, void* pdata, uint16_t size)
 	Limit = pcQ->len - pcQ->pWrite;
 	if (Limit >= size)
 	{
-		cQueue_Memcpy(_WriteAdr(pcQ), pdata, pcQ->unitSize * size);
+		cQueue_Memcpy(cQueue_WriteAdr(pcQ), pdata, pcQ->unitSize * size);
 	}
 	else
 	{
-		cQueue_Memcpy(_WriteAdr(pcQ), pdata, pcQ->unitSize * Limit);
+		cQueue_Memcpy(cQueue_WriteAdr(pcQ), pdata, pcQ->unitSize * Limit);
 		pdata = (uint8_t*)pdata + pcQ->unitSize * Limit;
 		cQueue_Memcpy(pcQ->data, pdata, pcQ->unitSize * (size - Limit));
 	}
 
-	_WriteMove(pcQ, size);
+	cQueue_WriteMove(pcQ, size);
 	if (spare < size) //写指针超过了读指针
 	{
 		pcQ->full = 1;
@@ -211,7 +319,7 @@ cQueueStatus cQueue_OverWrite(cQueue_t* pcQ, void* pdata, uint16_t size)
   * @param pReceive 接收数据的地址
   * @retval cQueueStatus OK/NULL/BUSY
   */
-cQueueStatus cQueue_Pop(cQueue_t *pcQ, void* pReceive)
+cQueueStatus cQueue_Pop(cQueue_t *pcQ, void *pReceive)
 {
 	cQueueAssert(pcQ);
 	cQueueAssert(pReceive);
@@ -222,8 +330,8 @@ cQueueStatus cQueue_Pop(cQueue_t *pcQ, void* pReceive)
 		status = CQUEUE_NULL;
 		goto exit;
 	}
-	cQueue_Memcpy(pReceive, _ReadAdr(pcQ), pcQ->unitSize);
-	_ReadMove(pcQ, 1);
+	cQueue_Memcpy(pReceive, cQueue_ReadAdr(pcQ), pcQ->unitSize);
+	cQueue_ReadMove(pcQ, 1);
 
 	exit:
 	__CQUEUE_UNLOCK(pcQ);
@@ -234,9 +342,10 @@ cQueueStatus cQueue_Pop(cQueue_t *pcQ, void* pReceive)
   * @brief 拿出多个数据单元
   * @param pcQ 队列句柄
   * @param pReceive 接收数据的地址
+  * @param size 缓存的大小
   * @retval cQueueStatus OK/NULL/BUSY
   */
-cQueueStatus cQueue_Pops(cQueue_t *pcQ, void* pReceive, uint16_t size)
+cQueueStatus cQueue_Pops(cQueue_t *pcQ, void *pReceive, uint16_t size)
 {
 	cQueueAssert(pcQ);
 	cQueueAssert(pReceive);
@@ -255,7 +364,7 @@ cQueueStatus cQueue_Pops(cQueue_t *pcQ, void* pReceive, uint16_t size)
 			status = CQUEUE_NULL;
 			goto exit;
 		}
-		cQueue_Memcpy(pReceive, _ReadAdr(pcQ), pcQ->unitSize * size);
+		cQueue_Memcpy(pReceive, cQueue_ReadAdr(pcQ), pcQ->unitSize * size);
 	}
 	else //(pcQ->pWrite <= pcQ->pRead)
 	{
@@ -269,16 +378,16 @@ cQueueStatus cQueue_Pops(cQueue_t *pcQ, void* pReceive, uint16_t size)
 		Limit = pcQ->len - pcQ->pRead;
 		if (Limit >= size)
 		{
-			cQueue_Memcpy(pReceive, _ReadAdr(pcQ), pcQ->unitSize * size);
+			cQueue_Memcpy(pReceive, cQueue_ReadAdr(pcQ), pcQ->unitSize * size);
 		}
 		else
 		{
-			cQueue_Memcpy(pReceive, _ReadAdr(pcQ), pcQ->unitSize * Limit);
+			cQueue_Memcpy(pReceive, cQueue_ReadAdr(pcQ), pcQ->unitSize * Limit);
 			pReceive = (uint8_t*)pReceive + pcQ->unitSize * Limit;
 			cQueue_Memcpy(pReceive, pcQ->data, pcQ->unitSize * (size - Limit));
 		}
 	}
-	_ReadMove(pcQ, size);
+	cQueue_ReadMove(pcQ, size);
 	exit:
 	__CQUEUE_UNLOCK(pcQ);
 	return status;
@@ -290,13 +399,13 @@ cQueueStatus cQueue_Pops(cQueue_t *pcQ, void* pReceive, uint16_t size)
   * @param pReceive 接收数据的地址
   * @retval cQueueStatus OK/NULL
   */
-cQueueStatus cQueue_Peek(cQueue_t *pcQ, void* pReceive)
+cQueueStatus cQueue_Peek(cQueue_t *pcQ, void *pReceive)
 {
 	cQueueAssert(pcQ);
 
 	if (cQueue_IS_NULL(pcQ))
 		return CQUEUE_NULL;
-	cQueue_Memcpy(pReceive, _ReadAdr(pcQ), pcQ->unitSize);
+	cQueue_Memcpy(pReceive, cQueue_ReadAdr(pcQ), pcQ->unitSize);
 	return CQUEUE_OK;
 }
 
@@ -307,7 +416,7 @@ cQueueStatus cQueue_Peek(cQueue_t *pcQ, void* pReceive)
   * @param size 偷看的长度
   * @retval cQueueStatus OK/NULL
   */
-cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void* pReceive, uint16_t size)
+cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void *pReceive, uint16_t size)
 {
 	cQueueAssert(pcQ);
 	cQueueAssert(pReceive);
@@ -325,8 +434,8 @@ cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void* pReceive, uint16_t size)
 			status = CQUEUE_NULL;
 			goto exit;
 		}
-		cQueue_Memcpy(pReceive, _ReadAdr(pcQ), pcQ->unitSize * size);
-		//_ReadMove(pcQ, size);
+		cQueue_Memcpy(pReceive, cQueue_ReadAdr(pcQ), pcQ->unitSize * size);
+		//cQueue_ReadMove(pcQ, size);
 	}
 	else //(pcQ->pWrite <= pcQ->pRead)
 	{
@@ -340,11 +449,11 @@ cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void* pReceive, uint16_t size)
 		Limit = pcQ->len - pcQ->pRead;
 		if (Limit >= size)
 		{
-			cQueue_Memcpy(pReceive, _ReadAdr(pcQ), pcQ->unitSize * size);
+			cQueue_Memcpy(pReceive, cQueue_ReadAdr(pcQ), pcQ->unitSize * size);
 		}
 		else
 		{
-			cQueue_Memcpy(pReceive, _ReadAdr(pcQ), pcQ->unitSize * Limit);
+			cQueue_Memcpy(pReceive, cQueue_ReadAdr(pcQ), pcQ->unitSize * Limit);
 			pReceive = (uint8_t*)pReceive + pcQ->unitSize * Limit;
 			cQueue_Memcpy(pReceive, pcQ->data, pcQ->unitSize * (size - Limit));
 		}
@@ -356,7 +465,7 @@ cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void* pReceive, uint16_t size)
 /**
  * @brief 得到剩余空间
  * @param pcQ 队列句柄
- * @retval uint16_t 
+ * @retval uint16_t [0, len]
  */
 uint16_t cQueue_Spare(cQueue_t *pcQ)
 {
@@ -375,6 +484,101 @@ uint16_t cQueue_Spare(cQueue_t *pcQ)
 		spare = pcQ->len;
 	}
 	return spare;
+}
+
+/**
+ * @brief 得到已用空间
+ * @param pcQ 队列句柄
+ * @retval uint16_t 已使用的单元数量[0, len]
+ */
+uint16_t cQueue_Usage(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	uint16_t usage = 0;
+	if (pcQ->pRead > pcQ->pWrite)
+	{
+		usage = pcQ->len - pcQ->pRead + pcQ->pWrite;
+	}
+	else if (pcQ->pRead < pcQ->pWrite)
+	{
+		usage = pcQ->pWrite - pcQ->pRead;
+	}
+	else if(pcQ->full != 0) // pWrite == pRead
+	{
+		usage = pcQ->len;
+	}
+	return usage;
+}
+
+/**
+ * @brief 写入变长度数据包 (size+data)
+ * @param pcQ cQueue ptr
+ * @param pdata data ptr
+ * @param size data size
+ * @retval cQueueStatus OK/NULL/BUSY
+ * @note unitSize 必须设定为 1
+ */
+cQueueStatus cQueue_Pushv(cQueue_t *pcQ, void *pdata, uint16_t size)
+{
+	cQueueAssert(pcQ);
+	cQueueAssert(pdata);
+	cQueueAssert(pcQ->unitSize == 1);
+
+    cQueueStatus status;
+    status = cQueue_Pushs(pcQ, &size, 2);
+    if (status != CQUEUE_OK)
+    {
+        return status;
+    }
+    status = cQueue_Pushs(pcQ, pdata, size);
+    if (status != CQUEUE_OK)
+    {
+        return status;
+    }
+    return CQUEUE_OK;
+}
+
+/**
+ * @brief 弹出变长数据包 (size+data)
+ * @param pcQ cQueue ptr
+ * @param pdata data buffer
+ * @param size data buffer size
+ * @retval data size
+ * @note unitSize 必须设定为 1
+ */
+uint16_t cQueue_Popv(cQueue_t *pcQ, void *pdata, uint16_t size)
+{
+	cQueueAssert(pcQ);
+	cQueueAssert(pdata);
+	cQueueAssert(pcQ->unitSize == 1);
+
+    cQueueStatus status;
+    uint16_t dataSize;
+    status = cQueue_Pops(pcQ, &dataSize, 2);
+    if (status != CQUEUE_OK)
+    {
+        return 0;
+    }
+    if (dataSize > size)
+    {
+        /* 数据包太大只能存一部分到缓存区，其他的丢弃！ */
+        status = cQueue_Pops(pcQ, pdata, size);
+        if (status != CQUEUE_OK)
+        {
+            return 0;
+        }
+        cQueue_Skip(pcQ, dataSize - size);
+        return size;
+    }
+    else
+    {
+        status = cQueue_Pops(pcQ, pdata, dataSize);
+        if (status != CQUEUE_OK)
+        {
+            return status;
+        }
+        return dataSize;
+    }
 }
 
 /**
@@ -401,18 +605,42 @@ int cQueue_Skip(cQueue_t *pcQ, uint16_t len)
 	cQueueAssert(pcQ);
 	cQueueAssert(len > 0);
 
-	int use = pcQ->len - cQueue_Spare(pcQ);
+	int use = cQueue_Usage(pcQ);
 	if (len > use)
 		len = use;
-	_ReadMove(pcQ, len);
+	cQueue_ReadMove(pcQ, len);
 	return len;
+}
+
+/**
+ * @brief 移动写指针位置
+ * @param pcQ 队列句柄
+ * @param len 移动的长度
+ */
+void cQueue_MoveWrite(cQueue_t *pcQ, uint16_t len)
+{
+	cQueueAssert(pcQ);
+	if (len == 0 && len > pcQ->len) return;
+	cQueue_WriteMove(pcQ, len);
+}
+
+/**
+ * @brief 移动读指针位置
+ * @param pcQ 队列句柄
+ * @param len 移动的长度
+ */
+void cQueue_MoveRead(cQueue_t *pcQ, uint16_t len)
+{
+	cQueueAssert(pcQ);
+	if (len == 0 && len > pcQ->len) return;
+	cQueue_ReadMove(pcQ, len);
 }
 
 /**
   * @brief  销毁队列
   * @param  pcQ 队列句柄 
   */
-cQueueStatus cQueue_Destroy(cQueue_t* pcQ)
+cQueueStatus cQueue_Destroy(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
 	cQueueAssert(pcQ->canFree);
@@ -425,7 +653,4 @@ cQueueStatus cQueue_Destroy(cQueue_t* pcQ)
 	cQueue_Free(pcQ);
 	return CQUEUE_OK;
 }
-
-
-
 
