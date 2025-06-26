@@ -67,7 +67,11 @@ int compareTestDatas(const void *td1, const void *td2, int size)
 void Test_cQueue_Create(void)
 {
 	cQueue_Create_Static(&cQStatic, &DataBuf, TESTUNIT, TESTSIZE);
+#if CQUEUE_USE_MALLOC
 	pcQ = cQueue_Create(TESTUNIT, TESTSIZE);
+#else
+	pcQ = &cQStatic;
+#endif
 	if(!pcQ) return;
 	EXPECT_EQ_INT(TESTSIZE, cQueue_Spare(pcQ));
 	EXPECT_EQ_INT(TESTSIZE, cQueue_Spare(&cQStatic));
@@ -118,7 +122,7 @@ void Test_cQueue_OverWrite(cQueue_t *p, testType *testData, int len)
 	cQueue_Peeks(p, actData, len);
 	EXPECT_EQ_TESTTYPE(testData, actData, len);
 
-	cQueue_OverWrite(p, test, TESTSIZE); //Ð´Âú0
+	cQueue_OverWrite(p, test, TESTSIZE); //???¨²0
 	cQueue_Peeks(p, actData, TESTSIZE);
 	EXPECT_EQ_TESTTYPE(test, actData, TESTSIZE);
 	
@@ -269,7 +273,9 @@ void Test_cQueue_Full_Usage(cQueue_t *p)
 
 void Test_cQueue_Destroy()
 {
+#ifdef CQUEUE_USE_MALLOC
 	cQueue_Destroy(pcQ);
+#endif
 	pcQ = NULL;
 }
 
@@ -328,9 +334,9 @@ void cQueue_Test(void)
 int main()
 {
 	
-	cQueue_Test();//µ¥Ôª²âÊÔ
+	cQueue_Test();//????????
 	printf("%d/%d (%3.2f%%) passed\n", test_pass, test_count, test_pass * 100.0 / test_count);
 	//MALLOC(4);
-	PRINT_LEAK_INFO();//ÄÚ´æÐ¹Â©²âÊÔ
+	PRINT_LEAK_INFO();//????????????
 	return (0);
 }
