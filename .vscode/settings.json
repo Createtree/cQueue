@@ -2,7 +2,8 @@
     "files.associations": {
         "stdio.h": "c",
         "stdarg.h": "c",
-        "cqueue.h": "c"
+        "cqueue.h": "c",
+        "mleak.h": "c"
     },
     "makefile.launchConfigurations": [
         {

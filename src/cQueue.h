@@ -4,7 +4,7 @@
 /*----------------------------------------------------------------------
   - File name     : cQueue.h
   - Author        : liuzhihua
-  - Update date   : 2024.03.09
+  - Update date   : 2025.06.26
   -	File Function : Circular Queue
   - Version       : v1.1
   - Origin        ：https://github.com/Createtree/cQueue
@@ -20,6 +20,7 @@
   *  2022.04.02       liuzhihua                  Create file
   *  2023.04.17       liuzhihua                   Rewrite
   *  2024.03.09       liuzhihua                Add and modify
+  *  2025.06.26       liuzhihua                Add and modify
 ***/
 
 #ifndef __CQUEUE_H_
@@ -37,15 +38,24 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <assert.h>
+
+#ifdef CQUEUE_UNIT_TEST
 #include "mleak.h"
+#endif /* CQUEUE_UNIT_TEST */
 /*-----------------------------------------------------------------------
 |                                DEFINES                                |
 -----------------------------------------------------------------------*/
-#define cQueue_Malloc(size) MALLOC(size)//malloc(size)
-#define cQueue_Free(pv) FREE(pv)//free(pv)
-#define cQueue_Memcpy(Dst,Src,size) memcpy(Dst,Src,size)
-#define cQueueAssert(x) assert(x)
-#define CQUEUE_USE_LOCK 0U
+
+/******************* User config start *******************/
+#ifdef CQUEUE_USE_MALLOC
+#define cQueue_Malloc(size)            MALLOC(size)  // malloc(size)
+#define cQueue_Free(pv)                FREE(pv)      // free(pv)
+#endif
+
+#define cQueue_Memcpy(Dst,Src,size)    memcpy(Dst,Src,size)
+#define cQueueAssert(x)                assert(x)
+#define CQUEUE_USE_LOCK                0U
+/******************** User config end ********************/
 
 #ifdef CQUEUE_USE_LOCK
 #define __CQUEUE_LOCK(_HANDLE_)            \
@@ -100,8 +110,13 @@ enum{
 /*-----------------------------------------------------------------------
 |                             API FUNCTION                              |
 -----------------------------------------------------------------------*/
+#ifdef CQUEUE_USE_MALLOC
 cQueue_t *cQueue_Create(uint8_t UnitSize, uint16_t Length);
+cQueueStatus cQueue_Destroy(cQueue_t *pcQ);
+#endif
 void cQueue_Create_Static(cQueue_t *pcQueue, void *pdata, uint8_t UnitSize, uint16_t Length);
+cQueueStatus cQueue_Set_UnitSize(cQueue_t *pcQueue, uint8_t UnitSize);
+uint8_t cQueue_Get_UnitSize(cQueue_t *pcQueue);
 cQueueStatus cQueue_Push(cQueue_t *pcQ, void *pdata);
 cQueueStatus cQueue_Pushs(cQueue_t *pcQ, void *pdata, uint16_t size);
 cQueueStatus cQueue_OverWrite(cQueue_t *pcQ, void *pdata, uint16_t size);
@@ -124,7 +139,6 @@ void *cQueue_GetReadAdr(cQueue_t *pcQ);
 void *cQueue_GetWriteAdr(cQueue_t *pcQ);
 void cQueue_MoveWrite(cQueue_t *pcQ, uint16_t len);
 void cQueue_MoveRead(cQueue_t *pcQ, uint16_t len);
-cQueueStatus cQueue_Destroy(cQueue_t *pcQ);
 #ifdef __cplusplus
 }
 #endif

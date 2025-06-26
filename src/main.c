@@ -35,7 +35,7 @@ int test_pass = 0;
 #define EXPECT_EQ_TESTTYPE(testData_, actData_, len) EXPECT_EQ_TESTARRAY(testData_, actData_, len*sizeof(testType))
 
 typedef short testType;
-#define TESTSIZE 10
+#define TESTSIZE 20
 #define TESTUNIT sizeof(testType)
 testType DataBuf[TESTSIZE] = {0};
 cQueue_t cQStatic;
@@ -206,11 +206,12 @@ void Test_cQueue_Peeks(cQueue_t *p, testType *testData, int len)
 	cQueue_Clear(p);
 }
 
-void Test_cQueue_WR_VariableLength(uint8_t *testData, int len)
+void Test_cQueue_WR_VariableLength(cQueue_t *p, uint8_t *testData, int len)
 {
 	int retlen;
 	uint8_t *actData = MALLOC(len * sizeof(uint8_t));
-	cQueue_t *p = cQueue_Create(1, 2*(len+2));
+	uint8_t unitSize = cQueue_Get_UnitSize(p);
+	cQueue_Set_UnitSize(p, 1);
 	cQueue_Pushv(p, testData, len);
 	cQueue_Pushv(p, testData, len>>1);
 	retlen = cQueue_Popv(p, actData, len);
@@ -219,8 +220,8 @@ void Test_cQueue_WR_VariableLength(uint8_t *testData, int len)
 	retlen = cQueue_Popv(p, actData, len);
 	EXPECT_EQ_INT(len>>1, retlen);
 	EXPECT_EQ_TESTARRAY(testData, actData, (len>>1));
-	cQueue_Destroy(p);
 	FREE(actData);
+	cQueue_Set_UnitSize(p, unitSize);
 }
 
 void Test_cQueue_WR_Margin(cQueue_t *p, testType *testData, int len)
@@ -312,8 +313,8 @@ void cQueue_Test(void)
 	Test_cQueue_Peeks(pcQ, TestData, TESTSIZE);
 	Test_cQueue_Peeks(&cQStatic, TestData, TESTSIZE);
 
-	Test_cQueue_WR_VariableLength((uint8_t*)TestData, TESTSIZE*sizeof(testType));
-	Test_cQueue_WR_VariableLength((uint8_t*)TestData, TESTSIZE/2*sizeof(testType));
+	Test_cQueue_WR_VariableLength(pcQ, (uint8_t*)TestData, TESTSIZE/2);
+	Test_cQueue_WR_VariableLength(&cQStatic, (uint8_t*)TestData, TESTSIZE/2);
 	Test_cQueue_WR_Margin(pcQ, TestData, TESTSIZE);
 	Test_cQueue_WR_Margin(&cQStatic, TestData, TESTSIZE/2);
 	//Exception Testing

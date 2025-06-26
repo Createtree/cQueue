@@ -30,6 +30,7 @@ static inline void cQueue_ReadMove(cQueue_t *pcQ, uint16_t len)
 	}
 }
 
+#ifdef CQUEUE_USE_MALLOC
 /**
  * @brief 创建队列
  * @param UnitSize 队列单元尺寸(Byte)
@@ -60,6 +61,7 @@ cQueue_t *cQueue_Create(uint8_t UnitSize, uint16_t Length)
 	}
 	return pcQ;
 }
+#endif
 
 /**
  * @brief 静态创建队列 
@@ -83,7 +85,24 @@ void cQueue_Create_Static(cQueue_t *pcQueue, void *pdata, uint8_t UnitSize, uint
 	pcQ->full = 0;
 	pcQ->canFree = 0;
 	pcQ->isInit = 1;
-	pcQ->lock = 0;
+	pcQ->lock = CQUEUE_UNLOCKED;
+}
+
+cQueueStatus cQueue_Set_UnitSize(cQueue_t *pcQ, uint8_t UnitSize)
+{
+	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
+	__CQUEUE_LOCK(pcQ);
+	pcQ->unitSize = UnitSize;
+	__CQUEUE_UNLOCK(pcQ);
+	return CQUEUE_OK;
+}
+
+uint8_t cQueue_Get_UnitSize(cQueue_t *pcQ)
+{
+	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
+	return pcQ->unitSize;
 }
 
 /**
@@ -94,6 +113,7 @@ void cQueue_Create_Static(cQueue_t *pcQueue, void *pdata, uint8_t UnitSize, uint
 uint16_t cQueue_GetLength(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	return pcQ->len;
 }
 
@@ -105,6 +125,7 @@ uint16_t cQueue_GetLength(cQueue_t *pcQ)
 uint16_t cQueue_Empty(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	return !!(cQueue_IS_NULL(pcQ));
 }
 
@@ -116,6 +137,7 @@ uint16_t cQueue_Empty(cQueue_t *pcQ)
 uint16_t cQueue_Full(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	return !(cQueue_IS_NULL(pcQ));
 }
 
@@ -127,6 +149,7 @@ uint16_t cQueue_Full(cQueue_t *pcQ)
 void *cQueue_GetReadAdr(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	return cQueue_ReadAdr(pcQ);
 }
 
@@ -138,6 +161,7 @@ void *cQueue_GetReadAdr(cQueue_t *pcQ)
 void *cQueue_GetWriteAdr(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	return cQueue_WriteAdr(pcQ);
 }
 
@@ -149,6 +173,7 @@ void *cQueue_GetWriteAdr(cQueue_t *pcQ)
 uint16_t cQueue_GetReadPtrMargin(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	uint16_t size = 0;
 	if (pcQ->pWrite > pcQ->pRead)
 	{
@@ -173,6 +198,7 @@ uint16_t cQueue_GetReadPtrMargin(cQueue_t *pcQ)
 uint16_t cQueue_GetWritePtrMargin(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	uint16_t size = 0;
 	if (pcQ->pWrite > pcQ->pRead)
 	{
@@ -228,7 +254,6 @@ cQueueStatus cQueue_Pushs(cQueue_t *pcQ, void *pdata, uint16_t size)
 {
 	cQueueAssert(pcQ);
 	cQueueAssert(pcQ->isInit);
-	cQueueAssert(pcQ->len >= size);
 
 	cQueueStatus status = CQUEUE_OK;
 	uint16_t Limit;
@@ -322,6 +347,7 @@ cQueueStatus cQueue_OverWrite(cQueue_t *pcQ, void *pdata, uint16_t size)
 cQueueStatus cQueue_Pop(cQueue_t *pcQ, void *pReceive)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	cQueueAssert(pReceive);
 	cQueueStatus status = CQUEUE_OK;
 	__CQUEUE_LOCK(pcQ);
@@ -348,6 +374,7 @@ cQueueStatus cQueue_Pop(cQueue_t *pcQ, void *pReceive)
 cQueueStatus cQueue_Pops(cQueue_t *pcQ, void *pReceive, uint16_t size)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	cQueueAssert(pReceive);
 	cQueueAssert(pcQ->len >= size);
 
@@ -402,6 +429,7 @@ cQueueStatus cQueue_Pops(cQueue_t *pcQ, void *pReceive, uint16_t size)
 cQueueStatus cQueue_Peek(cQueue_t *pcQ, void *pReceive)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 
 	if (cQueue_IS_NULL(pcQ))
 		return CQUEUE_NULL;
@@ -419,6 +447,7 @@ cQueueStatus cQueue_Peek(cQueue_t *pcQ, void *pReceive)
 cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void *pReceive, uint16_t size)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	cQueueAssert(pReceive);
 	cQueueAssert(pcQ->len >= size);
 
@@ -470,6 +499,7 @@ cQueueStatus cQueue_Peeks(cQueue_t *pcQ, void *pReceive, uint16_t size)
 uint16_t cQueue_Spare(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	uint16_t spare = 0;
 	if (pcQ->pRead > pcQ->pWrite)
 	{
@@ -494,6 +524,7 @@ uint16_t cQueue_Spare(cQueue_t *pcQ)
 uint16_t cQueue_Usage(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	uint16_t usage = 0;
 	if (pcQ->pRead > pcQ->pWrite)
 	{
@@ -521,6 +552,7 @@ uint16_t cQueue_Usage(cQueue_t *pcQ)
 cQueueStatus cQueue_Pushv(cQueue_t *pcQ, void *pdata, uint16_t size)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	cQueueAssert(pdata);
 	cQueueAssert(pcQ->unitSize == 1);
 
@@ -549,6 +581,7 @@ cQueueStatus cQueue_Pushv(cQueue_t *pcQ, void *pdata, uint16_t size)
 uint16_t cQueue_Popv(cQueue_t *pcQ, void *pdata, uint16_t size)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	cQueueAssert(pdata);
 	cQueueAssert(pcQ->unitSize == 1);
 
@@ -589,6 +622,7 @@ uint16_t cQueue_Popv(cQueue_t *pcQ, void *pdata, uint16_t size)
 void cQueue_Clear(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	pcQ->pWrite = 0;
 	pcQ->pRead = 0;
 	pcQ->full = 0;
@@ -603,6 +637,7 @@ void cQueue_Clear(cQueue_t *pcQ)
 int cQueue_Skip(cQueue_t *pcQ, uint16_t len)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	cQueueAssert(len > 0);
 
 	int use = cQueue_Usage(pcQ);
@@ -620,6 +655,7 @@ int cQueue_Skip(cQueue_t *pcQ, uint16_t len)
 void cQueue_MoveWrite(cQueue_t *pcQ, uint16_t len)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	if (len == 0 && len > pcQ->len) return;
 	cQueue_WriteMove(pcQ, len);
 }
@@ -632,10 +668,12 @@ void cQueue_MoveWrite(cQueue_t *pcQ, uint16_t len)
 void cQueue_MoveRead(cQueue_t *pcQ, uint16_t len)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	if (len == 0 && len > pcQ->len) return;
 	cQueue_ReadMove(pcQ, len);
 }
 
+#ifdef CQUEUE_USE_MALLOC
 /**
   * @brief  销毁队列
   * @param  pcQ 队列句柄 
@@ -643,14 +681,13 @@ void cQueue_MoveRead(cQueue_t *pcQ, uint16_t len)
 cQueueStatus cQueue_Destroy(cQueue_t *pcQ)
 {
 	cQueueAssert(pcQ);
+	cQueueAssert(pcQ->isInit);
 	cQueueAssert(pcQ->canFree);
 
-	if (pcQ->lock == CQUEUE_LOCKED)
-	{
-		return CQUEUE_BUSY;
-	}
+	__CQUEUE_LOCK(pcQ);
 	cQueue_Free(pcQ->data);
 	cQueue_Free(pcQ);
+	__CQUEUE_UNLOCK(pcQ);
 	return CQUEUE_OK;
 }
-
+#endif
